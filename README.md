@@ -1,6 +1,6 @@
 # Inertia.js Roda (Lite)
 
-A standalone [Roda](https://roda.jeremyevans.net/) plugin for seamlessly integrating [Inertia.js](https://inertiajs.com/) into your Ruby web applications without views or other plugins dependency.
+A standalone [Roda](https://roda.jeremyevans.net/) plugin for seamlessly integrating [Inertia.js](https://inertiajs.com/) without views or other plugins dependency.
 
 ---
 
