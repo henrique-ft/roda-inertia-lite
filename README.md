@@ -1,107 +1,189 @@
-# Inertia.js Roda Adapter
+# Inertia.js Roda (Lite)
 
-Server-side [Inertia.js](https://inertiajs.com) adapter for [Roda](https://roda.jeremyevans.net).
+A standalone [Roda](https://roda.jeremyevans.net/) plugin for seamlessly integrating [Inertia.js](https://inertiajs.com/) into your Ruby web applications without views or other plugins dependency.
+
+---
 
 ## Installation
 
-Add to your Gemfile:
+Add this line to your application's `Gemfile`:
 
 ```ruby
-gem "inertia-roda"
+gem "roda-inertia-lite"
 ```
 
-## Quick Start
+Then run:
+
+```bash
+bundle install
+```
+
+## Usage
+
+### 1. Register the plugin
+
+```ruby
+require "roda"
+
+class App < Roda
+  plugin :inertia, version: -> { "v1" }
+end
+```
+
+The `version` option is **required**. It can be a string or a callable (e.g., a lambda reading from an environment variable):
+
+```ruby
+# Static version
+plugin :inertia, version: "abc123"
+
+# Dynamic version (re-read on every request)
+plugin :inertia, version: { ENV.fetch("ASSET_VERSION", "v1") }
+```
+
+### 2. Render Inertia responses
+
+Use `inertia` in your routes to return page data as JSON (for Inertia requests) or as a full HTML document (for initial page loads):
 
 ```ruby
 class App < Roda
-  plugin :inertia, version: "1.0"
-
-  def inertia_share
-    { user: { email: "bobbytables@example.com"} }
-  end
+  plugin :inertia, version: -> { "v1" }
 
   route do |r|
-    r.get "dashboard" do
-      inertia "Dashboard", props: { name: "Alice" }
-    end
-
-    r.post "logout" do
-      logout!
-      inertia_redirect "/login"
+    r.get "users" do
+      inertia "Users/Index", props: { users: User.all }
     end
   end
 end
 ```
 
-The plugin loads Roda's `render` plugin automatically. Your layout template calls `inertia_root` to render the root `<div>` with page data:
+**For Inertia requests** (headers include `X-Inertia: true`):
+- Sets response header `X-Inertia: true`
+- Sets response header `Vary: X-Inertia`
+- Returns a JSON page object:
 
-`views/layout.erb`:
-
-```erb
-<!DOCTYPE html>
-<html>
-<head>
-  <title>My App</title>
-  <!-- Your JS and CSS assets go here (see Vite Integration below) -->
-</head>
-<body>
-  <%= inertia_root %>
-</body>
-</html>
+```json
+{
+  "component": "Users/Index",
+  "props": { "users": [{ "id": 1, "name": "Alice" }] },
+  "url": "/users",
+  "version": "v1"
+}
 ```
 
-To customize the views path or layout name, load the `render` plugin yourself:
+**For non-Inertia requests** (initial page load):
+- Returns a full HTML document with the JSON page data embedded in a `<div id="app" data-page='...'>` tag
+- The HTML structure is built from the configured layout (see [Custom Layout](#custom-layout))
+
+### 3. Handle redirects
+
+Use `inertia_redirect` for both Inertia and non-Inertia requests:
 
 ```ruby
-plugin :render, views: "app/views", layout: "my_layout"
-```
+class App < Roda
+  plugin :inertia, version: -> { "v1" }
 
-## Vite Integration
-
-`inertia-roda` pairs well with [vite_roda](https://github.com/holamendi/vite_roda) for asset management and hot reloading:
-
-```ruby
-plugin :vite
-plugin :inertia, version: -> { ViteRuby.digest }
-```
-
-Use the Vite helpers in your layout to load your frontend entrypoint:
-
-```erb
-<!DOCTYPE html>
-<html>
-<head>
-  <%= vite_client_tag %>
-  <%= vite_javascript_tag "application" %>
-</head>
-<body>
-  <%= inertia_root %>
-</body>
-</html>
-```
-
-## API
-
-### `inertia(component, props: {})`
-
-Renders an Inertia response. Returns JSON for Inertia requests, or a full HTML page (via layout) for initial page loads. Shared props from `inertia_share` are merged in automatically.
-
-### `inertia_redirect(path, status: nil)`
-
-Inertia-aware redirect. For Inertia requests with non-GET methods, defaults to 303 (forcing a GET). External URLs (different host) return a 409 with `X-Inertia-Location` header. You can override the status:
-
-```ruby
-inertia_redirect "/destination", status: 301
-```
-
-### `inertia_share`
-
-Provide shared props merged into every response:
-
-```ruby
-def inertia_share
-  { user: { email: "bobbytables@example.com"} }
+  route do |r|
+    r.post "users" do
+      user = User.create(r.params["user"])
+      inertia_redirect "/users/#{user.id}"
+    end
+  end
 end
+```
+
+**For Inertia requests:**
+- Internal paths (same host): redirects with **302** (GET) or **303** (non-GET)
+- External URLs (different host): returns **409 Conflict** with an `X-Inertia-Location` header, telling the client to perform a full page visit
+
+**For non-Inertia requests:**
+- Always performs a standard redirect (default **302**, or specify a custom status)
+
+**Custom status:**
+
+```ruby
+inertia_redirect "/dashboard", status: 301
+```
+
+### 4. Check if a request is an Inertia request
+
+Use `inertia_request?` to conditionally handle Inertia vs. non-Inertia requests:
+
+```ruby
+route do |r|
+  r.get "dashboard" do
+    if inertia_request?
+      inertia "Dashboard", props: { stats: calculate_stats }
+    else
+      # Handle non-Inertia request differently
+    end
+  end
+end
+```
+
+## Configuration
+
+### Custom Layout
+
+You can customize the HTML document structure string using the `layout` option:
+
+```ruby
+plugin :inertia,
+  version: -> { "v1" },
+  layout: {
+    head: "<title>My App</title>",
+    body: "<footer>&copy; 2024 My App</footer>"
+  }
+```
+
+This produces:
+
+```html
+<html><head><meta charset='utf-8' /><meta name='viewport' content='width=device-width, initial-scale=1, shrink-to-fit=no'><title>My App</title></head><body><div id='app' data-page='{...}'></div><footer>&copy; 2024 My App</footer></body></html>
+```
+
+## How It Works
+
+### Version Conflicts (409 Responses)
+
+When the client's asset version doesn't match the server's version (detected via the `X-Inertia-Version` header), the plugin returns a **409 Conflict** response with an `X-Inertia-Location` header. This tells the Inertia client to perform a full page reload to fetch fresh assets.
+
+```
+Client Request:
+  X-Inertia: true
+  X-Inertia-Version: v0
+
+Server Response:
+  Status: 409 Conflict
+  X-Inertia-Location: https://example.com/page
+```
+
+### Request Flow
+
+```
+                    +------------------+
+                    |   Inertia Request?|
+                    +--------+---------+
+                             |
+              +--------------+--------------+
+              |                             |
+              v                             v
+      +-------+-------+           +--------+--------+
+      | X-Inertia: true|           |  Initial Load   |
+      +-------+-------+           +--------+--------+
+              |                             |
+              v                             v
+    +---------+---------+         +---------+---------+
+    | Version matches?  |         |  Return full HTML  |
+    +---------+---------+         |  document with    |
+              |                   |  embedded JSON    |
+    +---------+---------+         +-------------------+
+    | Yes       | No    |
+    v           v
++---+---+   +---+---+   +------------------+
+| Return|   | 409   |   |  Redirect:       |
+| JSON  |   |Conflict|   |  302/303         |
++---+---+   +---+---+   +------------------+
+                           External? -> 409
 ```
 
 ## License
