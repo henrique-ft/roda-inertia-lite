@@ -1,4 +1,3 @@
-# Rakefile
 require "rake/testtask"
 require "standard/rake"
 
