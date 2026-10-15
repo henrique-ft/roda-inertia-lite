@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+## [0.1.1]
+- Remove "props:" keyword argument to make the syntax clear
+
 ## [0.1.0]
 
 - Fork of https://github.com/holamendi/inertia-roda
