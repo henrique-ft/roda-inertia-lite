@@ -51,7 +51,7 @@ class App < Roda
 
   route do |r|
     r.get "users" do
-      inertia "Users/Index", props: { users: User.all }
+      inertia "Users/Index", { users: User.all }
     end
   end
 end
@@ -113,7 +113,7 @@ Use `inertia_request?` to conditionally handle Inertia vs. non-Inertia requests:
 route do |r|
   r.get "dashboard" do
     if inertia_request?
-      inertia "Dashboard", props: { stats: calculate_stats }
+      inertia "Dashboard", { stats: calculate_stats }
     else
       # Handle non-Inertia request differently
     end
