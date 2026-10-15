@@ -31,7 +31,7 @@ class Roda
       end
 
       module InstanceMethods
-        def inertia(component, props: {})
+        def inertia(component, props={})
           if request.get? && inertia_request? && version_stale?
             response.status = 409
             response[X_INERTIA_LOCATION] = request.url

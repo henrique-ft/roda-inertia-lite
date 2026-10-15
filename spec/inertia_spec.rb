@@ -8,14 +8,14 @@ RSpec.describe "Inertia Roda Plugin" do
     route do |r|
       r.is "stale" do
         r.get do
-          data = inertia("StaleComponent", props: { name: "test" })
+          data = inertia("StaleComponent", { name: "test" })
           data.is_a?(Hash) ? (response["Content-Type"] = "application/json"; JSON.generate(data)) : data
         end
       end
 
       r.is "page" do
         r.get do
-          data = inertia("Users/Index", props: { users: [{ id: 1, name: "Alice" }] })
+          data = inertia("Users/Index", { users: [{ id: 1, name: "Alice" }] })
           data.is_a?(Hash) ? (response["Content-Type"] = "application/json"; JSON.generate(data)) : data
         end
       end
